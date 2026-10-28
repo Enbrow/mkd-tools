@@ -49,21 +49,20 @@ namespace MKD
 
     Result<RetainedSpan> RetainedSpan::map(const std::filesystem::path& path)
     {
-        auto mapping = MappedFile::open(path);
-        if (!mapping)
-            return std::unexpected(mapping.error());
-
-        auto owner = std::make_shared<MappedFile>(std::move(*mapping));
-        const auto bytes = owner->data();
-        return RetainedSpan(std::move(owner), bytes);
+        return MappedFile::open(path).transform([](MappedFile&& mapping)
+        {
+            auto owner = std::make_shared<MappedFile>(std::move(mapping));
+            const auto bytes = owner->data();
+            return RetainedSpan(std::move(owner), bytes);
+        });
     }
 
     Result<RetainedSpan> RetainedSpan::slice(const size_t offset, const size_t length) const
     {
-        auto view = detail::BinaryView(span_).slice(offset, length);
-        if (!view)
-            return std::unexpected(view.error());
-        return RetainedSpan(owner_, view->bytes());
+        return detail::BinaryView(span_).slice(offset, length).transform([this](const detail::BinaryView& view)
+        {
+            return RetainedSpan(owner_, view.bytes());
+        });
     }
 
     Result<std::string_view> RetainedSpan::utf8() const

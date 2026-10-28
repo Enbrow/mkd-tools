@@ -110,10 +110,10 @@ namespace MKD::detail
         if (sequence >= files_.size())
             return std::unexpected(std::format("Resource file sequence {} out of range", sequence));
         const auto& mapping = files_[sequence].mapping;
-        auto bytes = mapping->slice(offset, length);
-        if (!bytes)
-            return std::unexpected(bytes.error());
-        return RetainedSpan(mapping, *bytes);
+        return mapping->slice(offset, length).transform([&mapping](std::span<const uint8_t> bytes)
+        {
+            return RetainedSpan(mapping, bytes);
+        });
     }
 
     Result<RetainedSpan> ResourceFiles::readGlobal(size_t offset, size_t length) const

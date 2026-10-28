@@ -321,10 +321,7 @@ namespace MKD
 
     Result<std::string_view> Keystore::keyAt(const KeystoreIndex type, const size_t index) const
     {
-        auto entry = entryAt(type, index);
-        if (!entry)
-            return std::unexpected(entry.error());
-        return entry->key;
+        return entryAt(type, index).transform([](const KeystoreEntry& entry) { return entry.key; });
     }
 
     Result<std::vector<EntryId>> Keystore::entryIdsAt(const KeystoreIndex type, const size_t index,

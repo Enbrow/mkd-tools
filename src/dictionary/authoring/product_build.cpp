@@ -318,11 +318,7 @@ namespace MKD::detail
 
     Result<ValidationReport> ProductBuild::preflight(const ValidationOptions options) const
     {
-        auto prepared = prepare(options);
-        if (!prepared)
-            return std::unexpected(prepared.error());
-
-        return std::move(prepared->report);
+        return prepare(options).transform([](Prepared&& prepared) { return std::move(prepared.report); });
     }
 
     Result<void> ProductBuild::finish()

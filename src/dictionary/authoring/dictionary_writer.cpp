@@ -17,12 +17,12 @@ namespace MKD
 
     Result<EntryWriter> DictionaryWriter::createEntry(const std::optional<uint32_t> pageId, SourceContext context) const
     {
-        auto page = impl_->dictionary->reserveEntry(pageId, context);
-        if (!page)
-            return std::unexpected(page.error());
-
-        return EntryWriter(
-            std::make_unique<EntryWriter::Impl>(EntryWriter::Impl{impl_->dictionary, *page, std::move(context)}));
+        return impl_->dictionary->reserveEntry(pageId, context).transform([&](uint32_t page)
+        {
+            return EntryWriter(std::make_unique<EntryWriter::Impl>(EntryWriter::Impl{
+                impl_->dictionary, page, std::move(context)
+            }));
+        });
     }
 
     Result<void> DictionaryWriter::addPage(const uint32_t pageId, std::string_view xhtml, SourceContext context) const

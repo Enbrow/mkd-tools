@@ -52,26 +52,22 @@ namespace MKD
 
     Result<RetainedSpan> NamedResourceStore::get(std::string_view id) const
     {
-        auto record = impl_->index.findById(id);
-        if (!record)
-            return std::unexpected(record.error());
-
-        return impl_->data.get(*record);
+        return impl_->index.findById(id).and_then([this](const auto& record)
+        {
+            return impl_->data.get(record);
+        });
     }
 
 
     Result<NamedResourceStoreItem> NamedResourceStore::itemAt(const size_t index) const
     {
-        auto result = impl_->index.itemAt(index);
-        if (!result)
-            return std::unexpected(result.error());
-
-        auto [id, record] = *result;
-        auto dataResult = impl_->data.get(record);
-        if (!dataResult)
-            return std::unexpected(dataResult.error());
-
-        return NamedResourceStoreItem{std::string(id), std::move(*dataResult)};
+        return impl_->index.itemAt(index).and_then([this](const auto& item)
+        {
+            return impl_->data.get(item.second).transform([id = item.first](RetainedSpan&& data)
+            {
+                return NamedResourceStoreItem{std::string(id), std::move(data)};
+            });
+        });
     }
 
 

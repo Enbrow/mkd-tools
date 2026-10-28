@@ -135,7 +135,8 @@ namespace MKD
             {
                 auto content = contentDef;
                 auto configuration = searchConfiguration;
-                const auto directory = paths.productRoot() / detail::monokakido::paths::productContents / content.directory;
+                const auto directory = paths.productRoot() / detail::monokakido::paths::productContents / content.
+                    directory;
                 if (auto info = detail::ContentInfo::load(directory, content, configuration); !info)
                     return std::unexpected(info.error());
 
@@ -247,12 +248,11 @@ namespace MKD
 
     Result<RetainedSpan> DictionaryProduct::resource(std::string_view relativePath) const
     {
-        auto path = detail::resolveProductPath(paths_.productRoot() / detail::monokakido::paths::productContents,
-                                               relativePath);
-        if (!path)
-            return std::unexpected(path.error());
-
-        return RetainedSpan::map(*path);
+        return detail::resolveProductPath(paths_.productRoot() / detail::monokakido::paths::productContents,
+                                          relativePath).and_then([](const auto& path)
+        {
+            return RetainedSpan::map(path);
+        });
     }
 
     Result<AppendixEntryList> DictionaryProduct::openAppendixList(const AppendixList& list) const
@@ -294,11 +294,11 @@ namespace MKD
         else
             return std::optional<NavigationView>{};
 
-        auto root = NavigationView::open(paths_.productRoot() / detail::monokakido::paths::productContents, {relative, {}});
-        if (!root)
-            return std::unexpected(root.error());
-
-        return std::optional(std::move(*root));
+        return NavigationView::open(paths_.productRoot() / detail::monokakido::paths::productContents, {relative, {}}).
+            transform([](NavigationView&& root)
+            {
+                return std::optional(std::move(root));
+            });
     }
 
     std::string DictionaryProduct::displayTitle() const

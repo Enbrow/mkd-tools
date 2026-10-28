@@ -96,34 +96,28 @@ namespace MKD
         if (!entries_)
             return std::unexpected("Dictionary has no entry resource store");
 
-        auto data = entries_->get(itemId);
-        if (!data)
-            return std::unexpected(data.error());
-
-        return ResourceStoreItem{
-            .itemId = itemId,
-            .data = std::move(*data),
-        };
+        return entries_->get(itemId).transform([itemId](RetainedSpan&& data)
+        {
+            return ResourceStoreItem{.itemId = itemId, .data = std::move(data)};
+        });
     }
 
 
     Result<std::string> Dictionary::entryUtf8ByIndex(const size_t index) const
     {
-        auto entry = entryByIndex(index);
-        if (!entry)
-            return std::unexpected(entry.error());
-
-        return entry->data.utf8().transform([](std::string_view text) { return std::string(text); });
+        return entryByIndex(index).and_then([](const ResourceStoreItem& entry)
+        {
+            return entry.data.utf8().transform([](std::string_view text) { return std::string(text); });
+        });
     }
 
 
     Result<std::string> Dictionary::entryUtf8ById(const uint32_t itemId) const
     {
-        auto entry = entryById(itemId);
-        if (!entry)
-            return std::unexpected(entry.error());
-
-        return entry->data.utf8().transform([](std::string_view text) { return std::string(text); });
+        return entryById(itemId).and_then([](const ResourceStoreItem& entry)
+        {
+            return entry.data.utf8().transform([](std::string_view text) { return std::string(text); });
+        });
     }
 
 

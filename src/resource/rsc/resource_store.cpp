@@ -52,36 +52,28 @@ namespace MKD
 
     Result<RetainedSpan> ResourceStore::get(const uint32_t itemId) const
     {
-        const auto record = impl_->index.findById(itemId);
-        if (!record)
-            return std::unexpected(record.error());
-
-        return impl_->data.get(*record);
+        return impl_->index.findById(itemId).and_then([this](const auto& record)
+        {
+            return impl_->data.get(record);
+        });
     }
 
 
     Result<ResourceStoreItem> ResourceStore::itemAt(const size_t index) const
     {
-        auto result = impl_->index.itemAt(index);
-        if (!result)
-            return std::unexpected(result.error());
-
-        auto [id, record] = *result;
-        auto dataResult = impl_->data.get(record);
-        if (!dataResult)
-            return std::unexpected(dataResult.error());
-
-        return ResourceStoreItem{id, *dataResult};
+        return impl_->index.itemAt(index).and_then([this](const auto& item)
+        {
+            return impl_->data.get(item.second).transform([id = item.first](RetainedSpan&& data)
+            {
+                return ResourceStoreItem{id, std::move(data)};
+            });
+        });
     }
 
 
     Result<uint32_t> ResourceStore::idAt(const size_t index) const
     {
-        auto result = impl_->index.itemAt(index);
-        if (!result)
-            return std::unexpected(result.error());
-
-        return result->first;
+        return impl_->index.itemAt(index).transform([](const auto& item) { return item.first; });
     }
 
     Result<size_t> ResourceStore::indexOf(const uint32_t itemId) const

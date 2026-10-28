@@ -273,10 +273,7 @@ namespace MKD
     {
         if (std::holds_alternative<Impl::Binary>(impl_->state))
         {
-            auto data = impl_->section(section);
-            if (!data)
-                return std::unexpected(data.error());
-            return data->second.count;
+            return impl_->section(section).transform([](const auto& data) -> size_t { return data.second.count; });
         }
 
         if (section)

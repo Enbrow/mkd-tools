@@ -118,25 +118,23 @@ namespace MKD
 
     Result<std::optional<uint32_t>> EntryOrder::previous(const uint32_t pageId) const
     {
-        auto index = indexOf(pageId);
-        if (!index)
-            return std::unexpected(index.error());
+        return indexOf(pageId).transform([this](const size_t index) -> std::optional<uint32_t>
+        {
+            if (index == 0)
+                return std::nullopt;
 
-        if (*index == 0)
-            return std::optional<uint32_t>{};
-
-        return std::optional(page(*index - 1));
+            return page(index - 1);
+        });
     }
 
     Result<std::optional<uint32_t>> EntryOrder::next(const uint32_t pageId) const
     {
-        auto index = indexOf(pageId);
-        if (!index)
-            return std::unexpected(index.error());
+        return indexOf(pageId).transform([this](const size_t index) -> std::optional<uint32_t>
+        {
+            if (index + 1 == count_)
+                return std::nullopt;
 
-        if (*index + 1 == count_)
-            return std::optional<uint32_t>{};
-
-        return std::optional(page(*index + 1));
+            return page(index + 1);
+        });
     }
 }

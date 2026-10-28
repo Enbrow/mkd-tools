@@ -129,12 +129,9 @@ namespace MKD
         return *it;
     }
 
-    Result<ResourceStoreMapRecord> ResourceStoreIndex::findById(uint32_t id) const
+    Result<ResourceStoreMapRecord> ResourceStoreIndex::findById(const uint32_t id) const
     {
-        auto position = indexOf(id);
-        if (!position)
-            return std::unexpected(position.error());
-        return itemAt(*position)->second;
+        return indexOf(id).transform([this](const size_t position) { return itemAt(position)->second; });
     }
 
     Result<std::pair<uint32_t, ResourceStoreMapRecord>> ResourceStoreIndex::itemAt(size_t index) const

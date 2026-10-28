@@ -28,21 +28,19 @@ namespace MKD
     Result<ProductWriter> ProductWriter::create(const std::filesystem::path& destination, DictionaryMetadata metadata,
                                                 const CreationProfile profile)
     {
-        auto product = detail::ProductBuild::create(destination, std::move(metadata), profile);
-        if (!product)
-            return std::unexpected(product.error());
-
-        return ProductWriter(std::make_unique<Impl>(std::move(*product)));
+        return detail::ProductBuild::create(destination, std::move(metadata), profile).transform([](auto&& product)
+        {
+            return ProductWriter(std::make_unique<Impl>(std::move(product)));
+        });
     }
 
     Result<DictionaryWriter> ProductWriter::addDictionary(DictionaryContent content, DictionaryWriteOptions options,
                                                           SourceContext context) const
     {
-        auto dictionary = impl_->product->addDictionary(std::move(content), options, context);
-        if (!dictionary)
-            return std::unexpected(dictionary.error());
-
-        return DictionaryWriter(std::make_unique<DictionaryWriter::Impl>(std::move(*dictionary)));
+        return impl_->product->addDictionary(std::move(content), options, context).transform([](auto&& dictionary)
+        {
+            return DictionaryWriter(std::make_unique<DictionaryWriter::Impl>(std::move(dictionary)));
+        });
     }
 
     Result<void> ProductWriter::addAsset(std::string_view path, std::span<const uint8_t> bytes,

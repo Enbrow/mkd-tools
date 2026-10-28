@@ -129,10 +129,10 @@ namespace MKD
 
     Result<NamedResourceStoreIndexRecord> NamedResourceStoreIndex::findById(std::string_view id) const
     {
-        auto index = indexOf(id);
-        if (!index)
-            return std::unexpected(index.error());
-        return readRecord(*records_.slice(*index * 16, 16));
+        return indexOf(id).and_then([this](const size_t index)
+        {
+            return readRecord(*records_.slice(index * 16, 16));
+        });
     }
 
     Result<std::pair<std::string_view, NamedResourceStoreIndexRecord>> NamedResourceStoreIndex::itemAt(
@@ -147,9 +147,6 @@ namespace MKD
 
     Result<std::string_view> NamedResourceStoreIndex::idAt(size_t index) const
     {
-        auto item = itemAt(index);
-        if (!item)
-            return std::unexpected(item.error());
-        return item->first;
+        return itemAt(index).transform([](const auto& item) { return item.first; });
     }
 }
