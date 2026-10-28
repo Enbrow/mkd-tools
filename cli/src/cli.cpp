@@ -46,6 +46,13 @@ namespace MKDCLI
         command->add_option("product-id", export_.productId, "Product identifier (see 'list')")->required();
         command->callback([this] { invocation_.command = std::move(export_); });
 
+        const std::map<std::string, ExportFormat> formats{
+            {"directory", ExportFormat::Directory}, {"tar", ExportFormat::Tar}
+        };
+        auto formatNames = CLI::IsMember(formats);
+        command->add_option("--format", export_.format, "Output format (default: directory)")
+               ->transform((formatNames & CLI::Transformer(formats)).description(formatNames.get_description()))
+               ->type_name("FORMAT");
         auto& options = export_.options;
         command->add_option("-o,--output", export_.outputDirectory,
                             "Output directory (default: ./mkd-export/<product-id>)");

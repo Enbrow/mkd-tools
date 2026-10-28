@@ -30,10 +30,17 @@ namespace MKDCLI
         std::string productId;
     };
 
+    enum class ExportFormat
+    {
+        Directory,
+        Tar
+    };
+
     struct ExportCommand
     {
         std::string productId;
         MKD::ExportOptions options;
+        ExportFormat format = ExportFormat::Directory;
         std::filesystem::path outputDirectory;
     };
 

@@ -61,6 +61,7 @@ namespace MKD::Python
         std::exception_ptr failure_;
     };
 
+    template <bool Tar>
     ExportResult exportDictionary(const Dictionary& dictionary, const std::filesystem::path& destination,
                                   ExportOptions options, std::optional<ProgressCallback> callback)
     {
@@ -68,7 +69,10 @@ namespace MKD::Python
         Result<ExportResult> result;
         {
             nb::gil_scoped_release release;
-            result = exportToDirectory(dictionary, destination, options, progress.callback());
+            if constexpr (Tar)
+                result = exportToTar(dictionary, destination, options, progress.callback());
+            else
+                result = exportToDirectory(dictionary, destination, options, progress.callback());
         }
         progress.rethrow();
         return unwrap(std::move(result));
@@ -147,10 +151,15 @@ namespace MKD::Python
         bindExportOptions(module);
         bindExportResult(module);
         bindExportEvents(module);
-        module.def("export_to_directory", &exportDictionary, "dictionary"_a, "destination"_a,
+        module.def("export_to_directory", &exportDictionary<false>, "dictionary"_a, "destination"_a,
                    nb::kw_only(), "options"_a = ExportOptions{}, "progress"_a = nb::none(),
                    "Export selected resources, releasing the GIL during C++ export work. "
                    "File failures are returned in the result. Progress events are owned copies. "
                    "Callbacks may run on workers. A callback exception is raised after export finishes.");
+        module.def("export_to_tar", &exportDictionary<true>, "dictionary"_a, "destination"_a,
+                   nb::kw_only(), "options"_a = ExportOptions{}, "progress"_a = nb::none(),
+                   "Export one dictionary to an uncompressed tar archive. Any export failure raises Error. "
+                   "Progress counts members before publication. Existing archives require overwrite_existing. "
+                   "Callbacks and GIL handling follow export_to_directory.");
     }
 }

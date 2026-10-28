@@ -151,7 +151,12 @@ namespace MKDCLI
                 progress.onEvent(event);
             };
 
-            auto result = MKD::exportToDirectory(dict, outputDirectory / dict.id(), command.options, callback);
+            auto destination = outputDirectory / dict.id();
+            if (command.format == ExportFormat::Tar)
+                destination += ".tar";
+            auto result = command.format == ExportFormat::Tar
+                              ? MKD::exportToTar(dict, destination, command.options, callback)
+                              : MKD::exportToDirectory(dict, destination, command.options, callback);
 
             progress.finish();
             if (!result)

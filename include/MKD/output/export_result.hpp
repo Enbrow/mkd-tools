@@ -11,7 +11,7 @@
 
 namespace MKD
 {
-    /** Counts completed, skipped and failed output files. Bytes include only completed files. */
+    /** Counts completed, skipped and failed files or archive members. Bytes exclude tar headers and padding. */
     struct ExportResult
     {
         size_t totalFiles = 0;

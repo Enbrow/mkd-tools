@@ -4,6 +4,7 @@
 
 #include "export_session.hpp"
 #include "encoders.hpp"
+#include "tar_output.hpp"
 #include "directory_output.hpp"
 #include "unicode/unicode.hpp"
 #include "platform/parallel.hpp"
@@ -332,7 +333,10 @@ namespace MKD::detail
                 callback_(PhaseBeginEvent{type, count});
 
             ExportAccumulator progress(count, type, callback_);
-            if (auto prepared = output_.enterDirectory(directoryFor(type)); !prepared)
+            Result<void> prepared;
+            if constexpr (requires { output_.enterDirectory(directoryFor(type)); })
+                prepared = output_.enterDirectory(directoryFor(type));
+            if (!prepared)
                 progress.recordFailure(std::format("{}: {}", directoryFor(type).string(), prepared.error()), count);
             else
                 runPhase(type, progress);
@@ -342,7 +346,10 @@ namespace MKD::detail
                 callback_(PhaseEndEvent{type, result});
             combined += result;
         }
-        return combined;
+        if constexpr (requires { output_.finish(std::move(combined)); })
+            return output_.finish(std::move(combined));
+        else
+            return combined;
     }
 }
 
@@ -352,6 +359,13 @@ namespace MKD
                                            const ExportOptions& options, ExportCallback progress)
     {
         detail::DirectoryOutput output(destination, options.overwriteExisting, !options.createSubdirectories);
+        return detail::ExportSession(dictionary, output, options, std::move(progress)).run();
+    }
+
+    Result<ExportResult> exportToTar(const Dictionary& dictionary, const std::filesystem::path& destination,
+                                     const ExportOptions& options, ExportCallback progress)
+    {
+        detail::TarOutput output(destination, options.overwriteExisting);
         return detail::ExportSession(dictionary, output, options, std::move(progress)).run();
     }
 }

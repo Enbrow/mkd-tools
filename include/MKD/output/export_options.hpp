@@ -22,6 +22,7 @@ namespace MKD
     struct ExportOptions
     {
         std::vector<ResourceType> resources;
+        /** Replaces existing files, or the complete archive for tar export. */
         bool overwriteExisting = false;
         bool createSubdirectories = true;
         bool prettyPrintXml = false;

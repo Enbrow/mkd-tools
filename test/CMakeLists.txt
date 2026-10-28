@@ -26,6 +26,7 @@ add_executable(mkd-tests
         creation.cpp
         content.cpp
         export.cpp
+        tar_output.cpp
 )
 
 if (APPLE)

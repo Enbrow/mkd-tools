@@ -22,4 +22,15 @@ namespace MKD
         const std::filesystem::path& destination,
         const ExportOptions& options = {},
         ExportCallback progress = {});
+
+    /**
+     * Exports one dictionary to an uncompressed tar archive. Counts and byte totals describe members.
+     * Existing archives require overwriteExisting. Any failure discards the staged archive.
+     * Progress describes processed members before publication. Member order follows worker completion.
+     */
+    [[nodiscard]] Result<ExportResult> exportToTar(
+        const Dictionary& dictionary,
+        const std::filesystem::path& destination,
+        const ExportOptions& options = {},
+        ExportCallback progress = {});
 }

@@ -23,14 +23,16 @@
 
 namespace MKD::detail
 {
-    Result<std::unique_ptr<BuildDirectory>> BuildDirectory::create(const std::filesystem::path& destination)
+    Result<std::unique_ptr<BuildDirectory>> BuildDirectory::create(const std::filesystem::path& destination,
+                                                                   bool overwriteFile)
     {
         std::error_code error;
         const auto target = std::filesystem::absolute(destination, error).lexically_normal();
         if (error || target.filename().empty() || target == target.root_path())
-            return std::unexpected("Invalid output directory");
+            return std::unexpected("Invalid output destination");
 
-        if (std::filesystem::exists(std::filesystem::symlink_status(target, error)))
+        const auto status = std::filesystem::symlink_status(target, error);
+        if (std::filesystem::exists(status) && (!overwriteFile || !std::filesystem::is_regular_file(status)))
             return std::unexpected("Output already exists: " + target.string());
 
         if (error && error != std::errc::no_such_file_or_directory)
@@ -46,7 +48,7 @@ namespace MKD::detail
         {
             auto staging = target.parent_path() / std::format(".mkd-build-{}-{}", seed, serial.fetch_add(1));
             if (std::filesystem::create_directory(staging, error))
-                return std::unique_ptr<BuildDirectory>(new BuildDirectory(target, std::move(staging)));
+                return std::unique_ptr<BuildDirectory>(new BuildDirectory(target, std::move(staging), overwriteFile));
 
             if (error && error != std::errc::file_exists)
                 return std::unexpected("Cannot create build directory: " + error.message());
@@ -54,8 +56,8 @@ namespace MKD::detail
         return std::unexpected("Cannot allocate a build directory");
     }
 
-    BuildDirectory::BuildDirectory(std::filesystem::path destination, std::filesystem::path staging)
-        : destination_(std::move(destination)), staging_(std::move(staging))
+    BuildDirectory::BuildDirectory(std::filesystem::path destination, std::filesystem::path staging, bool overwriteFile)
+        : destination_(std::move(destination)), staging_(std::move(staging)), overwriteFile_(overwriteFile)
     {
     }
 
@@ -102,28 +104,44 @@ namespace MKD::detail
             return state;
 
         std::error_code error;
-        if (std::filesystem::exists(std::filesystem::symlink_status(destination_, error)))
+        const auto status = std::filesystem::symlink_status(destination_, error);
+        if (std::filesystem::exists(status) &&
+            (!overwriteFile_ || source == staging_ || !std::filesystem::is_regular_file(status)))
             return fail("Output already exists: " + destination_.string());
 
         if (error && error != std::errc::no_such_file_or_directory)
             return fail(error.message());
 
-        // Refuse a destination created by another writer after the initial check.
-#if defined(__APPLE__)
-        if (renameatx_np(AT_FDCWD, source.c_str(), AT_FDCWD, destination_.c_str(), RENAME_EXCL) != 0)
-            error = std::error_code(errno, std::generic_category());
-        else error.clear();
-#elif defined(__linux__)
-        if (syscall(SYS_renameat2, AT_FDCWD, source.c_str(), AT_FDCWD, destination_.c_str(), RENAME_NOREPLACE) != 0)
-            error = std::error_code(errno, std::generic_category());
-        else error.clear();
-#elif defined(_WIN32)
-        if (!MoveFileW(source.c_str(), destination_.c_str()))
-            error = std::error_code(GetLastError(), std::system_category());
-        else error.clear();
+        // File replacement is deferred until the staged output has closed successfully.
+        if (overwriteFile_ && source != staging_)
+        {
+#if defined(_WIN32)
+            if (!MoveFileExW(source.c_str(), destination_.c_str(), MOVEFILE_REPLACE_EXISTING))
+                error = std::error_code(GetLastError(), std::system_category());
+            else error.clear();
 #else
-        std::filesystem::rename(source, destination_, error);
+            std::filesystem::rename(source, destination_, error);
 #endif
+        }
+        else
+        {
+            // Refuse a destination created by another writer after the initial check.
+#if defined(__APPLE__)
+            if (renameatx_np(AT_FDCWD, source.c_str(), AT_FDCWD, destination_.c_str(), RENAME_EXCL) != 0)
+                error = std::error_code(errno, std::generic_category());
+            else error.clear();
+#elif defined(__linux__)
+            if (syscall(SYS_renameat2, AT_FDCWD, source.c_str(), AT_FDCWD, destination_.c_str(), RENAME_NOREPLACE) != 0)
+                error = std::error_code(errno, std::generic_category());
+            else error.clear();
+#elif defined(_WIN32)
+            if (!MoveFileW(source.c_str(), destination_.c_str()))
+                error = std::error_code(GetLastError(), std::system_category());
+            else error.clear();
+#else
+            std::filesystem::rename(source, destination_, error);
+#endif
+        }
         if (error)
             return fail("Cannot publish output: " + error.message());
         if (source != staging_)
