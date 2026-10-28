@@ -55,6 +55,7 @@ directory.
 
 ```sh
 mkd-tools export DAIJISEN2 -o ./output
+mkd-tools export DAIJISEN2 --format tar -o ./output
 mkd-tools export DAIJISEN2 --only entries --pretty
 mkd-tools export DAIJISEN2 --only graphics --only audio
 mkd-tools export DAIJISEN2 --only keystores --keystore-mode both

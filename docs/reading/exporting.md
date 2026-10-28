@@ -47,6 +47,29 @@ Existing files are skipped unless overwrite is enabled. Inspect `exported`,
 return a C++ error / raise `mkd.Error`. Individual output failures are collected
 in the result, so a returned result still needs checking.
 
+## Export to tar
+
+=== "Python"
+
+    ```python
+    options.overwrite_existing = True
+    result = mkd.export_to_tar(dictionary, "dictionary.tar", options=options)
+    ```
+
+=== "C++"
+
+    ```cpp
+    options.overwriteExisting = true;
+    auto result = MKD::exportToTar(*dictionary, "dictionary.tar", options).value();
+    ```
+
+```sh
+mkd-tools export DAIJISEN2 --format tar -o ./output
+# Writes ./output/DAIJISEN.J.tar
+```
+
+Tar is uncompressed and exports significantly faster. Directory export remains the default.
+
 ## Report progress
 
 === "Python"
