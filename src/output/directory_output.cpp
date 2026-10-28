@@ -75,14 +75,8 @@ namespace MKD::detail
 
     Result<std::filesystem::path> DirectoryOutput::preparePath(const std::filesystem::path& relativePath)
     {
-        const auto text = relativePath.generic_u8string();
-        if (text.empty() || relativePath.is_absolute() || relativePath.has_root_name() ||
-            text.find(u8'\\') != std::string::npos || text.find(u8'\0') != std::string::npos)
-            return std::unexpected("Invalid relative output path");
-
-        for (const auto& part : relativePath)
-            if (part.empty() || part == "." || part == "..")
-                return std::unexpected("Invalid relative output path component");
+        if (auto valid = validateRelativeOutputPath(relativePath); !valid)
+            return std::unexpected(valid.error());
 
         if (flat_)
         {

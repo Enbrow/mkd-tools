@@ -4,17 +4,20 @@
 
 #pragma once
 
-#include "io/output_file.hpp"
+#include "MKD/result.hpp"
 #include "MKD/resource/appendix_entry_list.hpp"
 #include "MKD/resource/headline_store.hpp"
 #include "MKD/resource/keystore.hpp"
 
+#include <ostream>
+#include <span>
+
 namespace MKD::detail
 {
-    Result<void> writePrettyXml(std::span<const uint8_t> bytes, OutputFile& output);
-    Result<void> writeHeadlines(const HeadlineStore& store, OutputFile& output);
-    Result<void> writeForwardKeys(const Keystore& store, OutputFile& output);
-    Result<void> writeInverseKeys(const Keystore& store, OutputFile& output);
+    Result<void> writePrettyXml(std::span<const uint8_t> bytes, std::ostream& output);
+    Result<void> writeHeadlines(const HeadlineStore& store, std::ostream& output);
+    Result<void> writeForwardKeys(const Keystore& store, std::ostream& output);
+    Result<void> writeInverseKeys(const Keystore& store, std::ostream& output);
     Result<void> writeAppendixEntries(const AppendixEntryList& list,
-                                      std::span<const HeadlineStore> headlines, OutputFile& output);
+                                      std::span<const HeadlineStore> headlines, std::ostream& output);
 }

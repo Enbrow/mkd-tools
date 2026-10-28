@@ -9,6 +9,20 @@
 
 namespace MKD::detail
 {
+    Result<void> validateRelativeOutputPath(const std::filesystem::path& path)
+    {
+        const auto text = path.generic_u8string();
+        if (text.empty() || path.is_absolute() || path.has_root_name() || text.find(u8'\\') != std::u8string::npos ||
+            text.find(u8'\0') != std::u8string::npos)
+            return std::unexpected("Invalid relative output path");
+
+        for (const auto& part : path)
+            if (part.empty() || part == "." || part == "..")
+                return std::unexpected("Invalid relative output path component");
+
+        return {};
+    }
+
     Result<void> OutputFile::writeAll(const std::filesystem::path& path, std::span<const uint8_t> bytes)
     {
         OutputFile file(path, false);

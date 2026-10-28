@@ -9,7 +9,7 @@
 
 namespace MKD::detail
 {
-    TsvWriter::TsvWriter(OutputFile& output) : output_(output)
+    TsvWriter::TsvWriter(std::ostream& output) : output_(output)
     {
         buffer_.reserve(64 * 1024);
     }
@@ -73,8 +73,11 @@ namespace MKD::detail
         if (error_)
             return std::unexpected(*error_);
 
-        auto written = output_.write(std::span(reinterpret_cast<const uint8_t*>(buffer_.data()), buffer_.size()));
+        output_.write(buffer_.data(), static_cast<std::streamsize>(buffer_.size()));
         buffer_.clear();
-        return written;
+        if (!output_)
+            return std::unexpected("Failed to write TSV output");
+
+        return {};
     }
 }

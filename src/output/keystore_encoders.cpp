@@ -9,7 +9,7 @@
 
 namespace MKD::detail
 {
-    Result<void> writeForwardKeys(const Keystore& store, OutputFile& output)
+    Result<void> writeForwardKeys(const Keystore& store, std::ostream& output)
     {
         TsvWriter table(output);
         for (auto entry : store.entries(KeystoreIndex::Prefix))
@@ -31,7 +31,7 @@ namespace MKD::detail
         return table.finish();
     }
 
-    Result<void> writeInverseKeys(const Keystore& store, OutputFile& output)
+    Result<void> writeInverseKeys(const Keystore& store, std::ostream& output)
     {
         auto ids = store.indexedEntryIds();
         if (!ids)

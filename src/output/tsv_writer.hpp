@@ -4,15 +4,18 @@
 
 #pragma once
 
-#include "io/output_file.hpp"
+#include "MKD/result.hpp"
 #include "MKD/resource/entry_id.hpp"
+
+#include <optional>
+#include <ostream>
 
 namespace MKD::detail
 {
     class TsvWriter
     {
     public:
-        explicit TsvWriter(OutputFile& output);
+        explicit TsvWriter(std::ostream& output);
         void field(std::string_view value);
         void field(std::u16string_view value);
         void field(EntryId value);
@@ -20,7 +23,7 @@ namespace MKD::detail
         Result<void> finish();
 
     private:
-        OutputFile& output_;
+        std::ostream& output_;
         std::string buffer_;
         bool firstField_ = true;
         std::optional<std::string> error_;

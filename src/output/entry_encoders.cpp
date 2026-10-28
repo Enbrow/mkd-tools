@@ -10,17 +10,20 @@
 
 namespace MKD::detail
 {
-    Result<void> writePrettyXml(std::span<const uint8_t> bytes, OutputFile& output)
+    Result<void> writePrettyXml(std::span<const uint8_t> bytes, std::ostream& output)
     {
         pugi::xml_document document;
         if (const auto parsed = document.load_buffer(bytes.data(), bytes.size()); !parsed)
             return std::unexpected(std::format("Invalid XML at byte {}: {}", parsed.offset, parsed.description()));
 
-        document.save(output.stream(), "  ", pugi::format_default, pugi::encoding_utf8);
+        document.save(output, "  ", pugi::format_default, pugi::encoding_utf8);
+        if (!output)
+            return std::unexpected("Failed to write XML output");
+
         return {};
     }
 
-    Result<void> writeHeadlines(const HeadlineStore& store, OutputFile& output)
+    Result<void> writeHeadlines(const HeadlineStore& store, std::ostream& output)
     {
         TsvWriter table(output);
         for (auto entry : store.entries())
@@ -39,7 +42,7 @@ namespace MKD::detail
     }
 
     Result<void> writeAppendixEntries(const AppendixEntryList& list,
-                                      std::span<const HeadlineStore> headlines, OutputFile& output)
+                                      std::span<const HeadlineStore> headlines, std::ostream& output)
     {
         TsvWriter table(output);
         for (const auto heading : {"entry_id", "label", "first_character", "headline"})

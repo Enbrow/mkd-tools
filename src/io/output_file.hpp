@@ -13,6 +13,14 @@
 
 namespace MKD::detail
 {
+    struct FileWriteResult
+    {
+        bool skipped = false;
+        uint64_t bytes = 0;
+    };
+
+    [[nodiscard]] Result<void> validateRelativeOutputPath(const std::filesystem::path& path);
+
     class OutputFile
     {
     public:

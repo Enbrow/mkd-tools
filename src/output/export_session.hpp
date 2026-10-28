@@ -4,17 +4,18 @@
 
 #pragma once
 
-#include "directory_output.hpp"
+#include "io/output_file.hpp"
 #include "export_accumulator.hpp"
 #include "MKD/dictionary/dictionary.hpp"
 #include "MKD/output/export.hpp"
 
 namespace MKD::detail
 {
+    template <typename Output>
     class ExportSession
     {
     public:
-        ExportSession(const Dictionary& dictionary, std::filesystem::path destination,
+        ExportSession(const Dictionary& dictionary, Output& output,
                       const ExportOptions& options, ExportCallback progress);
         Result<ExportResult> run();
 
@@ -42,6 +43,6 @@ namespace MKD::detail
         const Dictionary& dictionary_;
         ExportOptions options_;
         ExportCallback callback_;
-        DirectoryOutput output_;
+        Output& output_;
     };
 }

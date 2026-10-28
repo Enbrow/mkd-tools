@@ -15,12 +15,6 @@
 
 namespace MKD::detail
 {
-    struct FileWriteResult
-    {
-        bool skipped = false;
-        uint64_t bytes = 0;
-    };
-
     class DirectoryOutput
     {
     public:
@@ -51,6 +45,25 @@ namespace MKD::detail
                 return std::unexpected(result.error());
 
             return file.finish().transform([](const uint64_t bytes) { return FileWriteResult{false, bytes}; });
+        }
+
+        template <typename Producer>
+        Result<FileWriteResult> writeStream(const std::filesystem::path& path, Producer&& produce)
+        {
+            return writeFile(path, [&](OutputFile& file) { return produce(file.stream()); });
+        }
+
+        template <typename Producer>
+        Result<FileWriteResult> writeBytes(const std::filesystem::path& path, Producer&& produce)
+        {
+            return writeFile(path, [&](OutputFile& file) -> Result<void>
+            {
+                auto bytes = produce();
+                if (!bytes)
+                    return std::unexpected(bytes.error());
+
+                return file.write(bytes->span());
+            });
         }
 
     private:

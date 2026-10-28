@@ -4,6 +4,7 @@
 
 #include "export_session.hpp"
 #include "encoders.hpp"
+#include "directory_output.hpp"
 #include "unicode/unicode.hpp"
 #include "platform/parallel.hpp"
 #include "resource/rsc/resource_scan.hpp"
@@ -19,20 +20,23 @@
 
 namespace MKD::detail
 {
-    ExportSession::ExportSession(const Dictionary& dictionary, std::filesystem::path destination,
-                                 const ExportOptions& options, ExportCallback progress)
+    template <typename Output>
+    ExportSession<Output>::ExportSession(const Dictionary& dictionary, Output& output,
+                                         const ExportOptions& options, ExportCallback progress)
         : dictionary_(dictionary), options_(options), callback_(std::move(progress)),
-          output_(std::move(destination), options.overwriteExisting, !options.createSubdirectories)
+          output_(output)
     {
     }
 
-    bool ExportSession::needsAudioExtension(std::string_view id)
+    template <typename Output>
+    bool ExportSession<Output>::needsAudioExtension(std::string_view id)
     {
         const auto filename = id.substr(id.find_last_of('/') + 1);
         return filename.find('.') == std::string_view::npos;
     }
 
-    bool ExportSession::selected(ResourceType type) const
+    template <typename Output>
+    bool ExportSession<Output>::selected(ResourceType type) const
     {
         return options_.resources.empty() || std::ranges::any_of(options_.resources,
                                                                  [type](const ResourceType candidate)
@@ -43,7 +47,8 @@ namespace MKD::detail
                                                                  });
     }
 
-    size_t ExportSession::fileCount(const ResourceType type) const
+    template <typename Output>
+    size_t ExportSession<Output>::fileCount(const ResourceType type) const
     {
         switch (type)
         {
@@ -55,7 +60,8 @@ namespace MKD::detail
         }
     }
 
-    Result<std::filesystem::path> ExportSession::pathFor(const ResourceType type, std::string_view name) const
+    template <typename Output>
+    Result<std::filesystem::path> ExportSession<Output>::pathFor(const ResourceType type, std::string_view name) const
     {
         if (unicode::firstInvalidUtf8Offset(std::span(reinterpret_cast<const uint8_t*>(name.data()), name.size())))
             return std::unexpected("Output filename is not valid UTF-8");
@@ -64,7 +70,8 @@ namespace MKD::detail
         return directoryFor(type) / filename;
     }
 
-    std::filesystem::path ExportSession::directoryFor(const ResourceType type) const
+    template <typename Output>
+    std::filesystem::path ExportSession<Output>::directoryFor(const ResourceType type) const
     {
         if (!options_.createSubdirectories)
             return {};
@@ -75,8 +82,9 @@ namespace MKD::detail
                    : resourceTypeName(type);
     }
 
-    void ExportSession::record(ExportAccumulator& progress, Result<FileWriteResult> result,
-                               const std::filesystem::path& path)
+    template <typename Output>
+    void ExportSession<Output>::record(ExportAccumulator& progress, Result<FileWriteResult> result,
+                                       const std::filesystem::path& path)
     {
         if (!result)
         {
@@ -90,8 +98,9 @@ namespace MKD::detail
             progress.recordExport(result->bytes);
     }
 
+    template <typename Output>
     template <typename Scan>
-    void ExportSession::writeBatches(const Scan& scan, const ResourceType type, ExportAccumulator& progress)
+    void ExportSession<Output>::writeBatches(const Scan& scan, const ResourceType type, ExportAccumulator& progress)
     {
         runBatches(scan.size(), options_.concurrency, [&](size_t group)
         {
@@ -114,20 +123,23 @@ namespace MKD::detail
                     progress.recordFailure(path.error());
                     continue;
                 }
-                record(progress, output_.writeFile(*path, [&](OutputFile& file) -> Result<void>
-                {
-                    auto data = batch.dataAt(i);
-                    if (!data)
-                        return std::unexpected(data.error());
-                    if (type == ResourceType::Contents && options_.prettyPrintXml)
-                        return writePrettyXml(data->span(), file);
-                    return file.write(data->span());
-                }), *path);
+                if (type == ResourceType::Contents && options_.prettyPrintXml)
+                    record(progress, output_.writeStream(*path, [&](std::ostream& file) -> Result<void>
+                    {
+                        return batch.dataAt(i).and_then([&](const RetainedSpan& data)
+                        {
+                            return writePrettyXml(data.span(), file);
+                        });
+                    }), *path);
+                else
+                    record(progress, output_.writeBytes(*path, [&] { return batch.dataAt(i); }), *path);
             }
         });
     }
 
-    void ExportSession::writeResources(const ResourceStore& store, const ResourceType type, ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::writeResources(const ResourceStore& store, const ResourceType type,
+                                               ExportAccumulator& progress)
     {
         if (auto scan = ResourceScan::open(store); !scan)
             progress.recordFailure(scan.error(), store.size());
@@ -135,8 +147,9 @@ namespace MKD::detail
             writeBatches(*scan, type, progress);
     }
 
-    void ExportSession::writeResources(const NamedResourceStore& store, const ResourceType type,
-                                       ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::writeResources(const NamedResourceStore& store, const ResourceType type,
+                                               ExportAccumulator& progress)
     {
         auto scan = NamedResourceScan::open(store);
         if (!scan)
@@ -164,7 +177,8 @@ namespace MKD::detail
         writeBatches(*scan, type, progress);
     }
 
-    void ExportSession::writeFonts(ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::writeFonts(ExportAccumulator& progress)
     {
         for (const auto& font : dictionary_.fonts())
         {
@@ -174,16 +188,17 @@ namespace MKD::detail
                 progress.recordFailure(path.error());
                 continue;
             }
-            record(progress, output_.writeFile(*path, [&](OutputFile& file) -> Result<void>
+            record(progress, output_.writeStream(*path, [&](std::ostream& file) -> Result<void>
             {
-                return font.writeTo(file.stream()).transform([](uint64_t)
+                return font.writeTo(file).transform([](uint64_t)
                 {
                 });
             }), *path);
         }
     }
 
-    void ExportSession::writeTables(const ResourceType type, ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::writeTables(const ResourceType type, ExportAccumulator& progress)
     {
         if (type == ResourceType::Headlines)
         {
@@ -196,7 +211,8 @@ namespace MKD::detail
                     continue;
                 }
                 record(progress,
-                       output_.writeFile(*path, [&](OutputFile& file) { return writeHeadlines(store, file); }), *path);
+                       output_.writeStream(*path, [&](std::ostream& file) { return writeHeadlines(store, file); }),
+                       *path);
             }
             return;
         }
@@ -213,7 +229,7 @@ namespace MKD::detail
                     progress.recordFailure(path.error());
                     continue;
                 }
-                record(progress, output_.writeFile(*path, [&](OutputFile& file)
+                record(progress, output_.writeStream(*path, [&](std::ostream& file)
                 {
                     return inverse ? writeInverseKeys(store, file) : writeForwardKeys(store, file);
                 }), *path);
@@ -221,7 +237,8 @@ namespace MKD::detail
         }
     }
 
-    void ExportSession::writeAppendices(ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::writeAppendices(ExportAccumulator& progress)
     {
         std::unordered_set<std::string> names;
         for (const auto& list : dictionary_.appendixEntryLists())
@@ -249,14 +266,15 @@ namespace MKD::detail
                 progress.recordFailure(path.error());
                 continue;
             }
-            record(progress, output_.writeFile(*path, [&](OutputFile& file)
+            record(progress, output_.writeStream(*path, [&](std::ostream& file)
             {
                 return writeAppendixEntries(list, dictionary_.headlines(), file);
             }), *path);
         }
     }
 
-    void ExportSession::runPhase(ResourceType type, ExportAccumulator& progress)
+    template <typename Output>
+    void ExportSession<Output>::runPhase(ResourceType type, ExportAccumulator& progress)
     {
         switch (type)
         {
@@ -278,7 +296,8 @@ namespace MKD::detail
         }
     }
 
-    Result<ExportResult> ExportSession::run()
+    template <typename Output>
+    Result<ExportResult> ExportSession<Output>::run()
     {
         if (std::to_underlying(options_.keystoreExportMode) < 1 ||
             std::to_underlying(options_.keystoreExportMode) > std::to_underlying(KeystoreExportMode::Both))
@@ -332,6 +351,7 @@ namespace MKD
     Result<ExportResult> exportToDirectory(const Dictionary& dictionary, const std::filesystem::path& destination,
                                            const ExportOptions& options, ExportCallback progress)
     {
-        return detail::ExportSession(dictionary, destination, options, std::move(progress)).run();
+        detail::DirectoryOutput output(destination, options.overwriteExisting, !options.createSubdirectories);
+        return detail::ExportSession(dictionary, output, options, std::move(progress)).run();
     }
 }
